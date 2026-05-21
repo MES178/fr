@@ -29,6 +29,7 @@ const els = {
   statsGrid: document.getElementById("statsGrid"),
   weeklyChart: document.getElementById("weeklyChart"),
   monthlyOverview: document.getElementById("monthlyOverview"),
+  yearlyOverview: document.getElementById("yearlyOverview"),
   syncBtn: document.getElementById("syncBtn"),
   cloudStatus: document.getElementById("cloudStatus"),
   exportBtn: document.getElementById("exportBtn"),
@@ -406,6 +407,29 @@ function calculateMonthlyStats(year, month) {
   };
 }
 
+function activeStudyDaysForMonth(year, month) {
+  return new Set(getMonthEntries(year, month).map(entry => entry.date)).size;
+}
+
+function getYearlyOverviewStartMonth(year, currentMonth) {
+  const meta = loadMeta();
+  if (!meta.yearlyStartMonth) {
+    meta.yearlyStartMonth = `${year}-${String(currentMonth + 1).padStart(2, "0")}`;
+    saveMeta(meta);
+  }
+
+  const savedMatch = /^(\d{4})-(\d{2})$/.exec(meta.yearlyStartMonth);
+  const savedMonth = savedMatch && Number(savedMatch[1]) === year
+    ? Number(savedMatch[2]) - 1
+    : currentMonth;
+  const entryMonths = state.entries
+    .filter(entry => parseLocalDate(entry.date).getFullYear() === year)
+    .map(entry => parseLocalDate(entry.date).getMonth());
+  const earliestEntryMonth = entryMonths.length ? Math.min(...entryMonths) : currentMonth;
+
+  return Math.min(savedMonth, earliestEntryMonth, currentMonth);
+}
+
 function calculateWeekMinutes() {
   return getWeekDates(localDateString(new Date()))
     .reduce((sum, date) => sum + minutesForDate(date), 0);
@@ -674,6 +698,48 @@ function renderMonthlyOverview() {
   });
 }
 
+function renderYearlyOverview() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const startMonth = getYearlyOverviewStartMonth(year, currentMonth);
+  const monthData = Array.from({ length: currentMonth - startMonth + 1 }, (_, index) => {
+    const month = startMonth + index;
+    return {
+      month,
+      days: activeStudyDaysForMonth(year, month),
+      daysInMonth: new Date(year, month + 1, 0).getDate()
+    };
+  });
+  const maxDays = Math.max(...monthData.map(item => item.days), 1);
+
+  els.yearlyOverview.innerHTML = "";
+  monthData.forEach(item => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "year-month";
+    if (item.month === currentMonth) row.classList.add("current");
+    if (item.month > currentMonth) row.classList.add("future");
+
+    const monthName = new Date(year, item.month, 1)
+      .toLocaleDateString(undefined, { month: "short" });
+    const fill = item.days ? Math.max(8, (item.days / maxDays) * 100) : 0;
+
+    row.setAttribute("aria-label", `${monthName}: ${item.days} active study days`);
+    row.innerHTML = `
+      <span class="year-month-name">${monthName}</span>
+      <span class="year-track"><span class="year-fill" style="--fill: ${fill}%"></span></span>
+      <span class="year-month-count">${item.days}/${item.daysInMonth}</span>
+    `;
+    row.addEventListener("click", () => {
+      state.viewYear = year;
+      state.viewMonth = item.month;
+      setSelectedDate(localDateString(new Date(year, item.month, 1)));
+    });
+    els.yearlyOverview.appendChild(row);
+  });
+}
+
 function renderAll() {
   renderHeaderStats();
   renderCalendar();
@@ -681,6 +747,7 @@ function renderAll() {
   renderStats();
   renderWeeklyChart();
   renderMonthlyOverview();
+  renderYearlyOverview();
 }
 
 function showFormMessage(message, isSuccess) {

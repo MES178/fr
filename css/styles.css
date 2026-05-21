@@ -666,6 +666,63 @@ label {
   color: rgba(255, 250, 242, 0.84);
 }
 
+.yearly-overview {
+  display: grid;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.year-month {
+  display: grid;
+  grid-template-columns: 58px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: var(--inner-glow);
+}
+
+.year-month.current {
+  border-color: rgba(134, 174, 200, 0.42);
+  background: rgba(220, 236, 242, 0.32);
+}
+
+.year-month.future {
+  opacity: 0.68;
+}
+
+.year-month-name {
+  color: var(--navy);
+  font-weight: 850;
+}
+
+.year-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(134, 174, 200, 0.14);
+  overflow: hidden;
+  box-shadow: var(--inner-glow);
+}
+
+.year-fill {
+  width: var(--fill, 0%);
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--red), var(--gold));
+}
+
+.year-month-count {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 820;
+  white-space: nowrap;
+}
+
 .settings-actions {
   display: grid;
   grid-template-columns: 1fr;
