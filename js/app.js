@@ -160,6 +160,19 @@ function authUrl(path) {
   return `${baseUrl}/auth/v1/${path}`;
 }
 
+function appRedirectUrl() {
+  const url = new URL(window.location.href);
+  url.hash = "";
+  url.search = "";
+  if (url.pathname.endsWith("/index.html")) {
+    url.pathname = url.pathname.replace(/index\.html$/, "");
+  }
+  if (!url.pathname.endsWith("/")) {
+    url.pathname += "/";
+  }
+  return url.toString();
+}
+
 function updateCloudStatus(message) {
   if (els.cloudStatus) els.cloudStatus.textContent = message;
 }
@@ -204,6 +217,17 @@ function normalizeSession(payload) {
     refresh_token: payload.refresh_token,
     expires_at: payload.expires_at || Math.floor(Date.now() / 1000) + (payload.expires_in || 3600),
     user: payload.user
+  };
+}
+
+function normalizeSessionFromHash(params, user) {
+  const accessToken = params.get("access_token");
+  if (!accessToken || !user?.id) return null;
+  return {
+    access_token: accessToken,
+    refresh_token: params.get("refresh_token") || "",
+    expires_at: Number(params.get("expires_at")) || Math.floor(Date.now() / 1000) + Number(params.get("expires_in") || 3600),
+    user
   };
 }
 
@@ -255,6 +279,38 @@ async function authRequest(path, body, accessToken) {
   return payload;
 }
 
+async function fetchAuthUser(accessToken) {
+  const response = await fetch(authUrl("user"), {
+    method: "GET",
+    headers: authHeaders(accessToken)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.msg || payload.message || "Could not load user");
+  return payload;
+}
+
+async function handleAuthRedirect() {
+  if (!window.location.hash.includes("access_token=")) return false;
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const accessToken = params.get("access_token");
+  if (!accessToken) return false;
+
+  try {
+    const user = await fetchAuthUser(accessToken);
+    const session = normalizeSessionFromHash(params, user);
+    if (!session) throw new Error("Could not confirm account");
+    setSession(session);
+    window.history.replaceState(null, "", appRedirectUrl());
+    await loadAuthenticatedApp();
+    return true;
+  } catch (error) {
+    window.history.replaceState(null, "", appRedirectUrl());
+    els.authFeedback.textContent = error.message || "Email confirmation failed. Try signing in.";
+    renderAuthState();
+    return false;
+  }
+}
+
 async function signIn(email, password) {
   const payload = await authRequest("token?grant_type=password", { email, password });
   const session = normalizeSession(payload);
@@ -264,7 +320,7 @@ async function signIn(email, password) {
 }
 
 async function signUp(email, password) {
-  const payload = await authRequest("signup", { email, password });
+  const payload = await authRequest(`signup?redirect_to=${encodeURIComponent(appRedirectUrl())}`, { email, password });
   const session = normalizeSession(payload);
   if (session) {
     setSession(session);
@@ -1066,8 +1122,10 @@ function resetAllData() {
   renderAll();
 }
 
-function init() {
+async function init() {
   els.copyrightYear.textContent = String(new Date().getFullYear());
+  if (await handleAuthRedirect()) return;
+
   const savedSession = loadAuthSession();
   if (savedSession?.access_token && savedSession?.user?.id) {
     setSession(savedSession);

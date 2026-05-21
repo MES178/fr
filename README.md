@@ -22,7 +22,7 @@ GitHub Pages is static hosting, so cross-browser history needs an external datab
 
 1. Create a Supabase project.
 2. In Supabase, go to Authentication -> Providers and keep Email enabled.
-3. In Authentication -> URL Configuration, add your GitHub Pages URL to the allowed redirect/site URLs.
+3. In Authentication -> URL Configuration, set the Site URL to `https://mes178.github.io/fr/` and add `https://mes178.github.io/fr/` to Redirect URLs.
 4. Open the Supabase SQL editor and run `supabase/schema.sql`.
 5. In `js/cloud-config.js`, set:
    - `enabled: true`
