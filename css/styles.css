@@ -792,6 +792,17 @@ summary {
   z-index: 1;
 }
 
+.app-footer {
+  display: grid;
+  gap: 3px;
+  margin: 22px 0 4px;
+  color: rgba(116, 120, 135, 0.82);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

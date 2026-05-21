@@ -35,7 +35,8 @@ const els = {
   exportBtn: document.getElementById("exportBtn"),
   importInput: document.getElementById("importInput"),
   resetBtn: document.getElementById("resetBtn"),
-  settingsFeedback: document.getElementById("settingsFeedback")
+  settingsFeedback: document.getElementById("settingsFeedback"),
+  copyrightYear: document.getElementById("copyrightYear")
 };
 
 // Local date helpers avoid UTC conversion, which can shift days in Safari.
@@ -879,6 +880,7 @@ function resetAllData() {
 function init() {
   state.entries = loadEntries();
   sortEntries();
+  els.copyrightYear.textContent = String(new Date().getFullYear());
   els.entryDate.value = state.selectedDate;
   els.entryForm.addEventListener("submit", handleAddEntry);
   els.prevMonth.addEventListener("click", () => changeMonth(-1));
