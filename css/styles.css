@@ -793,14 +793,27 @@ summary {
 }
 
 .app-footer {
-  display: grid;
-  gap: 3px;
-  margin: 22px 0 4px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 5px;
+  row-gap: 2px;
+  width: calc(100% - 18px);
+  margin: 18px auto 28px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 18px;
+  background: rgba(255, 250, 242, 0.36);
   color: rgba(116, 120, 135, 0.82);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.35;
   text-align: center;
+  box-shadow: var(--inner-glow);
+}
+
+.app-footer span {
+  white-space: normal;
 }
 
 @media (prefers-reduced-motion: reduce) {
