@@ -11,7 +11,9 @@ const els = {
   entryDate: document.getElementById("entryDate"),
   durationMinutes: document.getElementById("durationMinutes"),
   activity: document.getElementById("activity"),
-  activityPills: document.getElementById("activityPills"),
+  activityPicker: document.getElementById("activityPicker"),
+  activityToggle: document.getElementById("activityToggle"),
+  activityMenu: document.getElementById("activityMenu"),
   note: document.getElementById("note"),
   formFeedback: document.getElementById("formFeedback"),
   currentStreak: document.getElementById("currentStreak"),
@@ -502,18 +504,24 @@ function showFormMessage(message, isSuccess) {
   }
 }
 
-function syncActivityPills() {
+function setActivityMenuOpen(isOpen) {
+  els.activityPicker.classList.toggle("open", isOpen);
+  els.activityToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
+function syncActivityOptions() {
   const currentActivity = els.activity.value.trim().toLowerCase();
-  els.activityPills.querySelectorAll(".activity-pill").forEach(button => {
+  els.activityMenu.querySelectorAll(".activity-option").forEach(button => {
     const isSelected = button.dataset.activity.toLowerCase() === currentActivity;
     button.classList.toggle("selected", isSelected);
-    button.setAttribute("aria-pressed", String(isSelected));
+    button.setAttribute("aria-selected", String(isSelected));
   });
 }
 
 function chooseActivity(activity) {
   els.activity.value = activity;
-  syncActivityPills();
+  syncActivityOptions();
+  setActivityMenuOpen(false);
   showFormMessage("", false);
 }
 
@@ -554,7 +562,8 @@ function handleAddEntry(event) {
   els.durationMinutes.value = "";
   els.activity.value = "";
   els.note.value = "";
-  syncActivityPills();
+  syncActivityOptions();
+  setActivityMenuOpen(false);
   showFormMessage("Saved. À demain.", true);
   renderAll();
 }
@@ -639,10 +648,20 @@ function init() {
   sortEntries();
   els.entryDate.value = state.selectedDate;
   els.entryForm.addEventListener("submit", handleAddEntry);
-  els.activity.addEventListener("input", syncActivityPills);
-  els.activityPills.addEventListener("click", event => {
-    const button = event.target.closest(".activity-pill");
+  els.activity.addEventListener("input", syncActivityOptions);
+  els.activity.addEventListener("focus", () => setActivityMenuOpen(true));
+  els.activityToggle.addEventListener("click", () => {
+    setActivityMenuOpen(!els.activityPicker.classList.contains("open"));
+  });
+  els.activityMenu.addEventListener("click", event => {
+    const button = event.target.closest(".activity-option");
     if (button) chooseActivity(button.dataset.activity);
+  });
+  document.addEventListener("click", event => {
+    if (!els.activityPicker.contains(event.target)) setActivityMenuOpen(false);
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") setActivityMenuOpen(false);
   });
   els.prevMonth.addEventListener("click", () => changeMonth(-1));
   els.nextMonth.addEventListener("click", () => changeMonth(1));

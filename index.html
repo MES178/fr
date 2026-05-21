@@ -51,16 +51,19 @@
           </div>
           <div class="field full">
             <label for="activity">Activity</label>
-            <input id="activity" name="activity" type="text" maxlength="24" autocomplete="off" placeholder="Udemy" required>
-            <div class="activity-pills" id="activityPills" aria-label="Quick activity choices">
-              <button class="activity-pill" type="button" data-activity="Duolingo">Duolingo</button>
-              <button class="activity-pill" type="button" data-activity="Udemy">Udemy</button>
-              <button class="activity-pill" type="button" data-activity="Exercise book">Exercise book</button>
-              <button class="activity-pill" type="button" data-activity="Podcast/YT">Podcast/YT</button>
-              <button class="activity-pill" type="button" data-activity="Grammar">Grammar</button>
-              <button class="activity-pill" type="button" data-activity="Tutor">Tutor</button>
-              <button class="activity-pill" type="button" data-activity="Anki">Anki</button>
-              <button class="activity-pill" type="button" data-activity="Reading">Reading</button>
+            <div class="activity-picker" id="activityPicker">
+              <input id="activity" name="activity" type="text" maxlength="24" autocomplete="off" placeholder="Udemy" required>
+              <button class="activity-toggle" id="activityToggle" type="button" aria-label="Show activity options" aria-expanded="false" aria-controls="activityMenu">⌄</button>
+              <div class="activity-menu" id="activityMenu" role="listbox" aria-label="Activity choices">
+                <button class="activity-option" type="button" role="option" data-activity="Duolingo">Duolingo</button>
+                <button class="activity-option" type="button" role="option" data-activity="Udemy">Udemy</button>
+                <button class="activity-option" type="button" role="option" data-activity="Exercise book">Exercise book</button>
+                <button class="activity-option" type="button" role="option" data-activity="Podcast/YT">Podcast/YT</button>
+                <button class="activity-option" type="button" role="option" data-activity="Grammar">Grammar</button>
+                <button class="activity-option" type="button" role="option" data-activity="Tutor">Tutor</button>
+                <button class="activity-option" type="button" role="option" data-activity="Anki">Anki</button>
+                <button class="activity-option" type="button" role="option" data-activity="Reading">Reading</button>
+              </div>
             </div>
           </div>
           <details class="optional-note">

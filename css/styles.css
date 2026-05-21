@@ -291,42 +291,95 @@ h1 {
   grid-column: 1 / -1;
 }
 
-.activity-pills {
-  display: flex;
-  gap: 8px;
-  margin-top: 9px;
-  padding-bottom: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+.activity-picker {
+  position: relative;
+  z-index: 20;
 }
 
-.activity-pills::-webkit-scrollbar {
-  display: none;
+.activity-picker input {
+  padding-right: 58px;
 }
 
-.activity-pill {
-  flex: 0 0 auto;
-  min-height: 38px;
-  padding: 0 13px;
+.activity-toggle {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
   border: 1px solid rgba(21, 33, 58, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.52);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--navy);
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: var(--inner-glow);
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.activity-toggle:active {
+  transform: scale(0.96);
+}
+
+.activity-picker.open .activity-toggle {
+  background: rgba(239, 209, 204, 0.5);
+  transform: rotate(180deg);
+}
+
+.activity-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-height: 0;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 250, 242, 0.96)),
+    var(--cream-2);
+  box-shadow: 0 18px 38px rgba(21, 33, 58, 0.16), var(--inner-glow);
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: max-height 0.2s ease, opacity 0.16s ease, transform 0.16s ease, padding 0.16s ease, border-color 0.16s ease;
+}
+
+.activity-picker.open .activity-menu {
+  max-height: 260px;
+  padding: 10px;
+  border-color: rgba(21, 33, 58, 0.11);
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.activity-option {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid rgba(21, 33, 58, 0.09);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.56);
   color: var(--navy-soft);
   font-size: 0.88rem;
-  font-weight: 780;
+  font-weight: 790;
   box-shadow: var(--inner-glow);
-  transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
-  white-space: nowrap;
+  text-align: center;
 }
 
-.activity-pill:active {
+.activity-option:active {
   transform: scale(0.97);
 }
 
-.activity-pill.selected {
+.activity-option.selected {
   border-color: rgba(173, 79, 77, 0.28);
-  background: rgba(239, 209, 204, 0.44);
+  background: rgba(239, 209, 204, 0.48);
   color: #8f403e;
 }
 
