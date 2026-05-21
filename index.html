@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F8F1E7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="French Habit Tracker">
+  <title>French Habit Tracker</title>
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div class="microcopy">Bonjour</div>
+      <h1>French Habit Tracker</h1>
+      <p class="subtitle">A quiet daily ritual for French practice, minutes, and momentum.</p>
+
+      <section class="streak-banner" aria-label="Current streak">
+        <div>
+          <small>Current streak</small>
+          <strong id="streakText">Ready when you are.</strong>
+        </div>
+        <div class="streak-count" aria-live="polite">
+          <span id="currentStreak">0</span>
+          days
+        </div>
+      </section>
+    </header>
+
+    <section class="card" aria-labelledby="quickAddTitle">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" id="quickAddTitle">Quick add</h2>
+          <p class="card-kicker">Log the session before the kettle cools. Très bien.</p>
+        </div>
+      </div>
+
+      <form id="entryForm" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label for="entryDate">Date</label>
+            <input id="entryDate" name="date" type="date" required>
+          </div>
+          <div class="field">
+            <label for="durationMinutes">Minutes</label>
+            <input id="durationMinutes" name="durationMinutes" type="number" inputmode="numeric" min="1" step="1" placeholder="25" required>
+          </div>
+          <div class="field full">
+            <label for="activity">Activity</label>
+            <input id="activity" name="activity" type="text" maxlength="24" autocomplete="off" placeholder="Udemy" required>
+            <div class="activity-pills" id="activityPills" aria-label="Quick activity choices">
+              <button class="activity-pill" type="button" data-activity="Duolingo">Duolingo</button>
+              <button class="activity-pill" type="button" data-activity="Udemy">Udemy</button>
+              <button class="activity-pill" type="button" data-activity="Exercise book">Exercise book</button>
+              <button class="activity-pill" type="button" data-activity="Podcast/YT">Podcast/YT</button>
+              <button class="activity-pill" type="button" data-activity="Grammar">Grammar</button>
+              <button class="activity-pill" type="button" data-activity="Tutor">Tutor</button>
+              <button class="activity-pill" type="button" data-activity="Anki">Anki</button>
+              <button class="activity-pill" type="button" data-activity="Reading">Reading</button>
+            </div>
+          </div>
+          <details class="optional-note">
+            <summary>Optional note</summary>
+            <div class="field">
+              <label for="note">Note</label>
+              <textarea id="note" name="note" maxlength="180" placeholder="Tiny context, if useful"></textarea>
+            </div>
+          </details>
+        </div>
+        <button class="primary-btn" type="submit">Save session</button>
+        <p class="feedback" id="formFeedback" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="card calendar-card" aria-labelledby="calendarTitle">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" id="calendarTitle">Calendar</h2>
+          <p class="card-kicker">Studied days carry a soft mark.</p>
+        </div>
+      </div>
+      <div class="month-nav">
+        <button class="icon-btn" id="prevMonth" type="button" aria-label="Previous month">‹</button>
+        <div class="month-label" id="monthLabel" aria-live="polite"></div>
+        <button class="icon-btn" id="nextMonth" type="button" aria-label="Next month">›</button>
+      </div>
+      <div class="weekday-row" aria-hidden="true">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </section>
+
+    <section class="card" aria-labelledby="entriesTitle">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" id="entriesTitle">Selected day</h2>
+          <p class="card-kicker" id="selectedDayLabel"></p>
+        </div>
+      </div>
+      <div class="entries-list" id="entriesList"></div>
+    </section>
+
+    <section class="card" aria-labelledby="statsTitle">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" id="statsTitle">Statistics</h2>
+          <p class="card-kicker">Progress, gently accounted for.</p>
+        </div>
+      </div>
+      <div class="stats-grid" id="statsGrid"></div>
+    </section>
+
+    <section class="card" aria-labelledby="weeklyChartTitle">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" id="weeklyChartTitle">This week</h2>
+          <p class="card-kicker">This week at a glance.</p>
+        </div>
+      </div>
+      <div class="chart" id="weeklyChart" aria-label="Weekly minutes bar chart"></div>
+    </section>
+
+    <section class="card overview-card" aria-labelledby="monthlyChartTitle">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" id="monthlyChartTitle">Monthly overview</h2>
+          <p class="card-kicker">A compact map of the selected month.</p>
+        </div>
+      </div>
+      <div class="month-heatmap" id="monthlyOverview" aria-label="Monthly daily minutes overview"></div>
+    </section>
+
+    <section class="card" aria-labelledby="settingsTitle">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" id="settingsTitle">Backup</h2>
+          <p class="card-kicker">Export, import, or reset your local data.</p>
+        </div>
+      </div>
+      <div class="settings-actions">
+        <button class="secondary-btn" id="exportBtn" type="button">Export JSON</button>
+        <label class="file-label">
+          Import JSON
+          <input id="importInput" type="file" accept="application/json,.json">
+        </label>
+      </div>
+      <details>
+        <summary>Reset options</summary>
+        <button class="danger-btn" id="resetBtn" type="button">Reset all data</button>
+      </details>
+      <p class="tiny-note" id="settingsFeedback" aria-live="polite">Saved only on this iPhone in Safari local storage.</p>
+    </section>
+  </main>
+
+  <script src="js/app.js" defer></script>
+</body>
+</html>
