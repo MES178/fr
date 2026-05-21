@@ -74,6 +74,10 @@ summary:focus-visible {
   outline-offset: 3px;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 input,
 select,
 textarea {
@@ -119,6 +123,34 @@ textarea {
   margin: 0 auto;
   padding: max(18px, env(safe-area-inset-top)) 16px max(34px, env(safe-area-inset-bottom));
   position: relative;
+}
+
+.auth-shell {
+  width: min(100%, 520px);
+  min-height: 100svh;
+  display: grid;
+  align-items: center;
+  margin: 0 auto;
+  padding: max(22px, env(safe-area-inset-top)) 16px max(34px, env(safe-area-inset-bottom));
+  position: relative;
+}
+
+.auth-card {
+  position: relative;
+  padding: 22px 19px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 250, 242, 0.2)),
+    var(--card);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
 }
 
 .hero {

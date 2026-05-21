@@ -1,17 +1,27 @@
 const STORAGE_KEY = "frenchHabitTracker.entries.v1";
 const META_STORAGE_KEY = "frenchHabitTracker.meta.v1";
+const AUTH_STORAGE_KEY = "frenchHabitTracker.authSession.v1";
 const CLOUD_TABLE = "habit_tracker_data";
 const cloudConfig = window.FHT_CLOUD_CONFIG || {};
 let cloudSaveTimer = null;
 
 const state = {
   entries: [],
+  session: null,
+  user: null,
   selectedDate: localDateString(new Date()),
   viewYear: new Date().getFullYear(),
   viewMonth: new Date().getMonth()
 };
 
 const els = {
+  authView: document.getElementById("authView"),
+  appView: document.getElementById("appView"),
+  authForm: document.getElementById("authForm"),
+  authEmail: document.getElementById("authEmail"),
+  authPassword: document.getElementById("authPassword"),
+  signUpBtn: document.getElementById("signUpBtn"),
+  authFeedback: document.getElementById("authFeedback"),
   entryForm: document.getElementById("entryForm"),
   entryDate: document.getElementById("entryDate"),
   durationMinutes: document.getElementById("durationMinutes"),
@@ -31,6 +41,7 @@ const els = {
   monthlyOverview: document.getElementById("monthlyOverview"),
   yearlyOverview: document.getElementById("yearlyOverview"),
   syncBtn: document.getElementById("syncBtn"),
+  signOutBtn: document.getElementById("signOutBtn"),
   cloudStatus: document.getElementById("cloudStatus"),
   exportBtn: document.getElementById("exportBtn"),
   importInput: document.getElementById("importInput"),
@@ -58,9 +69,21 @@ function addDays(dateString, amount) {
   return localDateString(date);
 }
 
+function userScopedKey(baseKey) {
+  return state.user?.id ? `${baseKey}.${state.user.id}` : baseKey;
+}
+
+function entriesStorageKey() {
+  return userScopedKey(STORAGE_KEY);
+}
+
+function metaStorageKey() {
+  return userScopedKey(META_STORAGE_KEY);
+}
+
 function loadMeta() {
   try {
-    return JSON.parse(localStorage.getItem(META_STORAGE_KEY) || "{}");
+    return JSON.parse(localStorage.getItem(metaStorageKey()) || "{}");
   } catch {
     return {};
   }
@@ -68,7 +91,7 @@ function loadMeta() {
 
 function saveMeta(meta) {
   try {
-    localStorage.setItem(META_STORAGE_KEY, JSON.stringify(meta));
+    localStorage.setItem(metaStorageKey(), JSON.stringify(meta));
   } catch {
     // Metadata is helpful for sync conflict decisions, but the app can still run without it.
   }
@@ -77,7 +100,7 @@ function saveMeta(meta) {
 // Persistence helpers keep the app fully offline and browser-local.
 function loadEntries() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(entriesStorageKey()) || "[]");
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter(isValidEntry)
@@ -96,7 +119,7 @@ function loadEntries() {
 function saveEntries(options = {}) {
   const { markChanged = true, syncCloud = true } = options;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+    localStorage.setItem(entriesStorageKey(), JSON.stringify(state.entries));
     if (markChanged) {
       const meta = loadMeta();
       meta.localModifiedAt = new Date().toISOString();
@@ -127,27 +150,153 @@ function isCloudEnabled() {
     cloudConfig.provider === "supabase" &&
     cloudConfig.supabaseUrl &&
     cloudConfig.supabaseAnonKey &&
-    cloudConfig.syncId &&
     !cloudConfig.supabaseUrl.includes("YOUR-PROJECT") &&
     !cloudConfig.supabaseAnonKey.includes("YOUR_PUBLIC")
   );
+}
+
+function authUrl(path) {
+  const baseUrl = cloudConfig.supabaseUrl.replace(/\/$/, "");
+  return `${baseUrl}/auth/v1/${path}`;
 }
 
 function updateCloudStatus(message) {
   if (els.cloudStatus) els.cloudStatus.textContent = message;
 }
 
-function cloudHeaders() {
+function authHeaders(accessToken = state.session?.access_token) {
   return {
     apikey: cloudConfig.supabaseAnonKey,
-    Authorization: `Bearer ${cloudConfig.supabaseAnonKey}`,
+    Authorization: accessToken ? `Bearer ${accessToken}` : `Bearer ${cloudConfig.supabaseAnonKey}`,
     "Content-Type": "application/json"
   };
+}
+
+function cloudHeaders() {
+  return authHeaders();
 }
 
 function cloudUrl(query = "") {
   const baseUrl = cloudConfig.supabaseUrl.replace(/\/$/, "");
   return `${baseUrl}/rest/v1/${CLOUD_TABLE}${query}`;
+}
+
+function loadAuthSession() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function saveAuthSession(session) {
+  if (!session) {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+}
+
+function normalizeSession(payload) {
+  if (!payload?.access_token || !payload?.user?.id) return null;
+  return {
+    access_token: payload.access_token,
+    refresh_token: payload.refresh_token,
+    expires_at: payload.expires_at || Math.floor(Date.now() / 1000) + (payload.expires_in || 3600),
+    user: payload.user
+  };
+}
+
+function setSession(session) {
+  state.session = session;
+  state.user = session?.user || null;
+  saveAuthSession(session);
+}
+
+function renderAuthState() {
+  const signedIn = Boolean(state.session?.access_token && state.user?.id);
+  els.authView.hidden = signedIn;
+  els.appView.hidden = !signedIn;
+  if (signedIn) updateCloudStatus(`Signed in as ${state.user.email || "your account"}.`);
+}
+
+async function authRequest(path, body, accessToken) {
+  const response = await fetch(authUrl(path), {
+    method: "POST",
+    headers: authHeaders(accessToken),
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error_description || payload.msg || payload.message || "Authentication failed");
+  return payload;
+}
+
+async function signIn(email, password) {
+  const payload = await authRequest("token?grant_type=password", { email, password });
+  const session = normalizeSession(payload);
+  if (!session) throw new Error("Could not create a session");
+  setSession(session);
+  await loadAuthenticatedApp();
+}
+
+async function signUp(email, password) {
+  const payload = await authRequest("signup", { email, password });
+  const session = normalizeSession(payload);
+  if (session) {
+    setSession(session);
+    await loadAuthenticatedApp();
+    return;
+  }
+  els.authFeedback.textContent = "Account created. Check your email, then sign in.";
+  els.authFeedback.classList.add("success");
+}
+
+async function refreshSessionIfNeeded() {
+  if (!state.session?.refresh_token) return false;
+  const expiresSoon = state.session.expires_at && state.session.expires_at < Math.floor(Date.now() / 1000) + 120;
+  if (!expiresSoon) return true;
+  try {
+    const payload = await authRequest("token?grant_type=refresh_token", {
+      refresh_token: state.session.refresh_token
+    });
+    const session = normalizeSession(payload);
+    if (!session) return false;
+    setSession(session);
+    return true;
+  } catch {
+    setSession(null);
+    return false;
+  }
+}
+
+async function signOut() {
+  if (state.session?.access_token) {
+    fetch(authUrl("logout"), {
+      method: "POST",
+      headers: authHeaders()
+    }).catch(() => {});
+  }
+  setSession(null);
+  state.entries = [];
+  renderAuthState();
+  els.authFeedback.textContent = "";
+}
+
+function migrateLegacyEntriesToUser() {
+  const meta = loadMeta();
+  if (meta.legacyMigratedAt) return;
+  try {
+    const legacyEntries = cleanCloudEntries(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
+    if (legacyEntries.length && !state.entries.length) {
+      state.entries = mergeEntries(state.entries, legacyEntries);
+      saveEntries({ markChanged: true, syncCloud: false });
+    }
+    meta.legacyMigratedAt = new Date().toISOString();
+    saveMeta(meta);
+  } catch {
+    meta.legacyMigratedAt = new Date().toISOString();
+    saveMeta(meta);
+  }
 }
 
 function cleanCloudEntries(entries) {
@@ -185,7 +334,7 @@ function mergeEntries(localEntries, cloudEntries) {
 }
 
 async function fetchCloudSnapshot() {
-  const query = `?id=eq.${encodeURIComponent(cloudConfig.syncId)}&select=entries,updated_at&limit=1`;
+  const query = `?id=eq.${encodeURIComponent(state.user.id)}&select=entries,updated_at&limit=1`;
   const response = await fetch(cloudUrl(query), {
     method: "GET",
     headers: cloudHeaders()
@@ -196,7 +345,8 @@ async function fetchCloudSnapshot() {
 }
 
 async function pushCloudEntries() {
-  if (!isCloudEnabled()) return false;
+  if (!isCloudEnabled() || !state.user?.id) return false;
+  if (!(await refreshSessionIfNeeded())) throw new Error("Not signed in");
   const updatedAt = new Date().toISOString();
   const response = await fetch(cloudUrl("?on_conflict=id"), {
     method: "POST",
@@ -205,7 +355,7 @@ async function pushCloudEntries() {
       Prefer: "resolution=merge-duplicates,return=minimal"
     },
     body: JSON.stringify({
-      id: cloudConfig.syncId,
+      id: state.user.id,
       entries: state.entries,
       updated_at: updatedAt
     })
@@ -232,6 +382,11 @@ function queueCloudSave() {
 async function syncCloudNow() {
   if (!isCloudEnabled()) {
     updateCloudStatus("Cloud sync is off. Configure js/cloud-config.js to sync across browsers.");
+    return;
+  }
+  if (!state.user?.id || !(await refreshSessionIfNeeded())) {
+    updateCloudStatus("Sign in to sync your private history.");
+    renderAuthState();
     return;
   }
 
@@ -281,6 +436,16 @@ async function syncCloudNow() {
   } catch {
     updateCloudStatus("Cloud sync failed. Check Supabase settings and network access.");
   }
+}
+
+async function loadAuthenticatedApp() {
+  renderAuthState();
+  state.entries = loadEntries();
+  migrateLegacyEntriesToUser();
+  sortEntries();
+  els.entryDate.value = state.selectedDate;
+  renderAll();
+  await syncCloudNow();
 }
 
 // Entry mutations are intentionally small and always followed by a save.
@@ -878,19 +1043,42 @@ function resetAllData() {
 }
 
 function init() {
-  state.entries = loadEntries();
-  sortEntries();
   els.copyrightYear.textContent = String(new Date().getFullYear());
-  els.entryDate.value = state.selectedDate;
+  const savedSession = loadAuthSession();
+  if (savedSession?.access_token && savedSession?.user?.id) {
+    setSession(savedSession);
+    loadAuthenticatedApp();
+  } else {
+    renderAuthState();
+  }
+
+  els.authForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    els.authFeedback.textContent = "";
+    els.authFeedback.classList.remove("success");
+    try {
+      await signIn(els.authEmail.value.trim(), els.authPassword.value);
+    } catch (error) {
+      els.authFeedback.textContent = error.message || "Sign in failed.";
+    }
+  });
+  els.signUpBtn.addEventListener("click", async () => {
+    els.authFeedback.textContent = "";
+    els.authFeedback.classList.remove("success");
+    try {
+      await signUp(els.authEmail.value.trim(), els.authPassword.value);
+    } catch (error) {
+      els.authFeedback.textContent = error.message || "Account creation failed.";
+    }
+  });
   els.entryForm.addEventListener("submit", handleAddEntry);
   els.prevMonth.addEventListener("click", () => changeMonth(-1));
   els.nextMonth.addEventListener("click", () => changeMonth(1));
   els.exportBtn.addEventListener("click", exportData);
   els.importInput.addEventListener("change", event => importData(event.target.files[0]));
   els.syncBtn.addEventListener("click", syncCloudNow);
+  els.signOutBtn.addEventListener("click", signOut);
   els.resetBtn.addEventListener("click", resetAllData);
-  renderAll();
-  syncCloudNow();
 }
 
 init();

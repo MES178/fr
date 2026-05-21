@@ -16,18 +16,18 @@ A static, mobile-first French study habit tracker for GitHub Pages.
 
 Upload the contents of this folder to GitHub Pages. No build step, backend, or dependencies are required.
 
-## Optional Cloud Sync
+## Private Cloud Sync With Supabase Auth
 
-GitHub Pages is static hosting, so cross-browser history needs an external database. This app supports optional Supabase sync without npm or build tools.
+GitHub Pages is static hosting, so cross-browser history needs an external database. This app uses Supabase Auth and RLS so only the signed-in user can read or write their history.
 
 1. Create a Supabase project.
-2. Open the Supabase SQL editor and run `supabase/schema.sql`.
-3. If you change `syncId` in `js/cloud-config.js`, also replace `french-tracker-main` in the SQL policies before running them.
-4. In `js/cloud-config.js`, set:
+2. In Supabase, go to Authentication -> Providers and keep Email enabled.
+3. In Authentication -> URL Configuration, add your GitHub Pages URL to the allowed redirect/site URLs.
+4. Open the Supabase SQL editor and run `supabase/schema.sql`.
+5. In `js/cloud-config.js`, set:
    - `enabled: true`
    - `supabaseUrl` to your Supabase project URL
    - `supabaseAnonKey` to your public anon/publishable key
-   - `syncId` to your chosen row ID
-5. Deploy the folder to GitHub Pages.
+6. Deploy the folder to GitHub Pages.
 
-The app still saves to localStorage first. When cloud sync is enabled, it also stores one JSON record in Supabase so Safari and Chrome can share the same history.
+The app still saves to user-scoped localStorage first. When cloud sync is enabled and the user is signed in, it stores one JSON record in Supabase under that user's `auth.uid()`.

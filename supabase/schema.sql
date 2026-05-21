@@ -6,22 +6,28 @@ create table if not exists public.habit_tracker_data (
 
 alter table public.habit_tracker_data enable row level security;
 
--- Replace french-tracker-main with the same syncId used in js/cloud-config.js.
-create policy "French tracker read"
+drop policy if exists "French tracker read" on public.habit_tracker_data;
+drop policy if exists "French tracker insert" on public.habit_tracker_data;
+drop policy if exists "French tracker update" on public.habit_tracker_data;
+drop policy if exists "French tracker authenticated read" on public.habit_tracker_data;
+drop policy if exists "French tracker authenticated insert" on public.habit_tracker_data;
+drop policy if exists "French tracker authenticated update" on public.habit_tracker_data;
+
+create policy "French tracker authenticated read"
 on public.habit_tracker_data
 for select
-to anon
-using (id = 'french-tracker-main');
+to authenticated
+using (id = auth.uid()::text);
 
-create policy "French tracker insert"
+create policy "French tracker authenticated insert"
 on public.habit_tracker_data
 for insert
-to anon
-with check (id = 'french-tracker-main');
+to authenticated
+with check (id = auth.uid()::text);
 
-create policy "French tracker update"
+create policy "French tracker authenticated update"
 on public.habit_tracker_data
 for update
-to anon
-using (id = 'french-tracker-main')
-with check (id = 'french-tracker-main');
+to authenticated
+using (id = auth.uid()::text)
+with check (id = auth.uid()::text);
