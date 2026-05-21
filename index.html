@@ -51,20 +51,17 @@
           </div>
           <div class="field full">
             <label for="activity">Activity</label>
-            <div class="activity-picker" id="activityPicker">
-              <input id="activity" name="activity" type="text" maxlength="24" autocomplete="off" placeholder="Udemy" required>
-              <button class="activity-toggle" id="activityToggle" type="button" aria-label="Show activity options" aria-expanded="false" aria-controls="activityMenu">⌄</button>
-              <div class="activity-menu" id="activityMenu" role="listbox" aria-label="Activity choices">
-                <button class="activity-option" type="button" role="option" data-activity="Duolingo">Duolingo</button>
-                <button class="activity-option" type="button" role="option" data-activity="Udemy">Udemy</button>
-                <button class="activity-option" type="button" role="option" data-activity="Exercise book">Exercise book</button>
-                <button class="activity-option" type="button" role="option" data-activity="Podcast/YT">Podcast/YT</button>
-                <button class="activity-option" type="button" role="option" data-activity="Grammar">Grammar</button>
-                <button class="activity-option" type="button" role="option" data-activity="Tutor">Tutor</button>
-                <button class="activity-option" type="button" role="option" data-activity="Anki">Anki</button>
-                <button class="activity-option" type="button" role="option" data-activity="Reading">Reading</button>
-              </div>
-            </div>
+            <select id="activity" name="activity" required>
+              <option value="">Choose activity</option>
+              <option value="Duolingo">Duolingo</option>
+              <option value="Udemy">Udemy</option>
+              <option value="Exercise book">Exercise book</option>
+              <option value="Podcast/YT">Podcast/YT</option>
+              <option value="Grammar">Grammar</option>
+              <option value="Tutor">Tutor</option>
+              <option value="Anki">Anki</option>
+              <option value="Reading">Reading</option>
+            </select>
           </div>
           <details class="optional-note">
             <summary>Optional note</summary>
@@ -145,12 +142,14 @@
         </div>
       </div>
       <div class="settings-actions">
+        <button class="secondary-btn" id="syncBtn" type="button">Sync now</button>
         <button class="secondary-btn" id="exportBtn" type="button">Export JSON</button>
         <label class="file-label">
           Import JSON
           <input id="importInput" type="file" accept="application/json,.json">
         </label>
       </div>
+      <p class="tiny-note" id="cloudStatus" aria-live="polite">Cloud sync is off. Configure js/cloud-config.js to sync across browsers.</p>
       <details>
         <summary>Reset options</summary>
         <button class="danger-btn" id="resetBtn" type="button">Reset all data</button>
@@ -159,6 +158,7 @@
     </section>
   </main>
 
+  <script src="js/cloud-config.js"></script>
   <script src="js/app.js" defer></script>
 </body>
 </html>

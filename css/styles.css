@@ -57,6 +57,7 @@ body::before {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -74,6 +75,7 @@ summary:focus-visible {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   min-width: 0;
@@ -94,7 +96,14 @@ input[type="date"] {
   text-align: left;
 }
 
+select {
+  appearance: auto;
+  -webkit-appearance: menulist;
+  color: var(--navy);
+}
+
 input:focus,
+select:focus,
 textarea:focus {
   border-color: rgba(143, 178, 202, 0.9);
   box-shadow: 0 0 0 4px rgba(143, 178, 202, 0.18);
@@ -289,98 +298,6 @@ h1 {
 
 .field.full {
   grid-column: 1 / -1;
-}
-
-.activity-picker {
-  position: relative;
-  z-index: 20;
-}
-
-.activity-picker input {
-  padding-right: 58px;
-}
-
-.activity-toggle {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border: 1px solid rgba(21, 33, 58, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.62);
-  color: var(--navy);
-  font-size: 1.25rem;
-  font-weight: 900;
-  line-height: 1;
-  box-shadow: var(--inner-glow);
-  transition: transform 0.16s ease, background 0.16s ease;
-}
-
-.activity-toggle:active {
-  transform: scale(0.96);
-}
-
-.activity-picker.open .activity-toggle {
-  background: rgba(239, 209, 204, 0.5);
-  transform: rotate(180deg);
-}
-
-.activity-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  max-height: 0;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 250, 242, 0.96)),
-    var(--cream-2);
-  box-shadow: 0 18px 38px rgba(21, 33, 58, 0.16), var(--inner-glow);
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-  transform: translateY(-4px);
-  transition: max-height 0.2s ease, opacity 0.16s ease, transform 0.16s ease, padding 0.16s ease, border-color 0.16s ease;
-}
-
-.activity-picker.open .activity-menu {
-  max-height: 260px;
-  padding: 10px;
-  border-color: rgba(21, 33, 58, 0.11);
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.activity-option {
-  min-height: 44px;
-  padding: 0 10px;
-  border: 1px solid rgba(21, 33, 58, 0.09);
-  border-radius: 15px;
-  background: rgba(255, 255, 255, 0.56);
-  color: var(--navy-soft);
-  font-size: 0.88rem;
-  font-weight: 790;
-  box-shadow: var(--inner-glow);
-  text-align: center;
-}
-
-.activity-option:active {
-  transform: scale(0.97);
-}
-
-.activity-option.selected {
-  border-color: rgba(173, 79, 77, 0.28);
-  background: rgba(239, 209, 204, 0.48);
-  color: #8f403e;
 }
 
 label {
@@ -751,7 +668,7 @@ label {
 
 .settings-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -834,6 +751,10 @@ summary {
 
   .form-grid {
     grid-template-columns: minmax(0, 1fr) minmax(118px, 0.72fr);
+  }
+
+  .settings-actions {
+    grid-template-columns: 1fr 1fr;
   }
 
   h1 {

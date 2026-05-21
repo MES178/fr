@@ -1,4 +1,9 @@
 const STORAGE_KEY = "frenchHabitTracker.entries.v1";
+const META_STORAGE_KEY = "frenchHabitTracker.meta.v1";
+const CLOUD_TABLE = "habit_tracker_data";
+const cloudConfig = window.FHT_CLOUD_CONFIG || {};
+let cloudSaveTimer = null;
+
 const state = {
   entries: [],
   selectedDate: localDateString(new Date()),
@@ -11,9 +16,6 @@ const els = {
   entryDate: document.getElementById("entryDate"),
   durationMinutes: document.getElementById("durationMinutes"),
   activity: document.getElementById("activity"),
-  activityPicker: document.getElementById("activityPicker"),
-  activityToggle: document.getElementById("activityToggle"),
-  activityMenu: document.getElementById("activityMenu"),
   note: document.getElementById("note"),
   formFeedback: document.getElementById("formFeedback"),
   currentStreak: document.getElementById("currentStreak"),
@@ -27,6 +29,8 @@ const els = {
   statsGrid: document.getElementById("statsGrid"),
   weeklyChart: document.getElementById("weeklyChart"),
   monthlyOverview: document.getElementById("monthlyOverview"),
+  syncBtn: document.getElementById("syncBtn"),
+  cloudStatus: document.getElementById("cloudStatus"),
   exportBtn: document.getElementById("exportBtn"),
   importInput: document.getElementById("importInput"),
   resetBtn: document.getElementById("resetBtn"),
@@ -52,6 +56,22 @@ function addDays(dateString, amount) {
   return localDateString(date);
 }
 
+function loadMeta() {
+  try {
+    return JSON.parse(localStorage.getItem(META_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveMeta(meta) {
+  try {
+    localStorage.setItem(META_STORAGE_KEY, JSON.stringify(meta));
+  } catch {
+    // Metadata is helpful for sync conflict decisions, but the app can still run without it.
+  }
+}
+
 // Persistence helpers keep the app fully offline and browser-local.
 function loadEntries() {
   try {
@@ -71,9 +91,16 @@ function loadEntries() {
   }
 }
 
-function saveEntries() {
+function saveEntries(options = {}) {
+  const { markChanged = true, syncCloud = true } = options;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+    if (markChanged) {
+      const meta = loadMeta();
+      meta.localModifiedAt = new Date().toISOString();
+      saveMeta(meta);
+    }
+    if (syncCloud) queueCloudSave();
     return true;
   } catch {
     return false;
@@ -90,6 +117,168 @@ function isValidEntry(entry) {
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function isCloudEnabled() {
+  return Boolean(
+    cloudConfig.enabled &&
+    cloudConfig.provider === "supabase" &&
+    cloudConfig.supabaseUrl &&
+    cloudConfig.supabaseAnonKey &&
+    cloudConfig.syncId &&
+    !cloudConfig.supabaseUrl.includes("YOUR-PROJECT") &&
+    !cloudConfig.supabaseAnonKey.includes("YOUR_PUBLIC")
+  );
+}
+
+function updateCloudStatus(message) {
+  if (els.cloudStatus) els.cloudStatus.textContent = message;
+}
+
+function cloudHeaders() {
+  return {
+    apikey: cloudConfig.supabaseAnonKey,
+    Authorization: `Bearer ${cloudConfig.supabaseAnonKey}`,
+    "Content-Type": "application/json"
+  };
+}
+
+function cloudUrl(query = "") {
+  const baseUrl = cloudConfig.supabaseUrl.replace(/\/$/, "");
+  return `${baseUrl}/rest/v1/${CLOUD_TABLE}${query}`;
+}
+
+function cleanCloudEntries(entries) {
+  return Array.isArray(entries)
+    ? entries
+      .filter(isValidEntry)
+      .map(entry => ({
+        id: String(entry.id || createId()),
+        date: entry.date,
+        durationMinutes: Number(entry.durationMinutes),
+        activity: String(entry.activity).trim(),
+        note: entry.note ? String(entry.note) : ""
+      }))
+    : [];
+}
+
+function mergeEntries(localEntries, cloudEntries) {
+  const mergedById = new Map();
+  [...cloudEntries, ...localEntries].forEach(entry => {
+    if (isValidEntry(entry)) {
+      const id = String(entry.id || createId());
+      mergedById.set(id, {
+        id,
+        date: entry.date,
+        durationMinutes: Number(entry.durationMinutes),
+        activity: String(entry.activity).trim(),
+        note: entry.note ? String(entry.note) : ""
+      });
+    }
+  });
+  return Array.from(mergedById.values()).sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.id.localeCompare(b.id);
+  });
+}
+
+async function fetchCloudSnapshot() {
+  const query = `?id=eq.${encodeURIComponent(cloudConfig.syncId)}&select=entries,updated_at&limit=1`;
+  const response = await fetch(cloudUrl(query), {
+    method: "GET",
+    headers: cloudHeaders()
+  });
+  if (!response.ok) throw new Error("Cloud fetch failed");
+  const rows = await response.json();
+  return rows[0] || null;
+}
+
+async function pushCloudEntries() {
+  if (!isCloudEnabled()) return false;
+  const updatedAt = new Date().toISOString();
+  const response = await fetch(cloudUrl("?on_conflict=id"), {
+    method: "POST",
+    headers: {
+      ...cloudHeaders(),
+      Prefer: "resolution=merge-duplicates,return=minimal"
+    },
+    body: JSON.stringify({
+      id: cloudConfig.syncId,
+      entries: state.entries,
+      updated_at: updatedAt
+    })
+  });
+  if (!response.ok) throw new Error("Cloud save failed");
+  const meta = loadMeta();
+  meta.lastCloudSyncedAt = updatedAt;
+  meta.localModifiedAt = updatedAt;
+  saveMeta(meta);
+  updateCloudStatus(`Cloud sync complete: ${new Date(updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`);
+  return true;
+}
+
+function queueCloudSave() {
+  if (!isCloudEnabled()) return;
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = window.setTimeout(() => {
+    pushCloudEntries().catch(() => {
+      updateCloudStatus("Cloud sync failed. Local changes are still saved on this browser.");
+    });
+  }, 700);
+}
+
+async function syncCloudNow() {
+  if (!isCloudEnabled()) {
+    updateCloudStatus("Cloud sync is off. Configure js/cloud-config.js to sync across browsers.");
+    return;
+  }
+
+  updateCloudStatus("Checking cloud sync...");
+  try {
+    const cloudSnapshot = await fetchCloudSnapshot();
+    const meta = loadMeta();
+    const hasUnsyncedLocal = Boolean(
+      meta.lastCloudSyncedAt &&
+      meta.localModifiedAt &&
+      meta.localModifiedAt > meta.lastCloudSyncedAt
+    );
+
+    if (cloudSnapshot) {
+      const cloudEntries = cleanCloudEntries(cloudSnapshot.entries);
+      const hasNeverSyncedLocalData = state.entries.length > 0 && !meta.lastCloudSyncedAt;
+
+      if (hasUnsyncedLocal || hasNeverSyncedLocalData) {
+        state.entries = mergeEntries(state.entries, cloudEntries);
+        sortEntries();
+        saveEntries({ markChanged: true, syncCloud: false });
+        await pushCloudEntries();
+        renderAll();
+        updateCloudStatus("Local and cloud histories were merged.");
+        return;
+      }
+
+      state.entries = cloudEntries;
+      sortEntries();
+      saveEntries({ markChanged: false, syncCloud: false });
+      saveMeta({
+        ...meta,
+        lastCloudSyncedAt: cloudSnapshot.updated_at,
+        localModifiedAt: cloudSnapshot.updated_at
+      });
+      renderAll();
+      updateCloudStatus(`Cloud data loaded: ${new Date(cloudSnapshot.updated_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}.`);
+      return;
+    }
+
+    if (!cloudSnapshot && !state.entries.length) {
+      updateCloudStatus("Cloud sync is ready. No study entries yet.");
+      return;
+    }
+
+    await pushCloudEntries();
+  } catch {
+    updateCloudStatus("Cloud sync failed. Check Supabase settings and network access.");
+  }
 }
 
 // Entry mutations are intentionally small and always followed by a save.
@@ -504,27 +693,6 @@ function showFormMessage(message, isSuccess) {
   }
 }
 
-function setActivityMenuOpen(isOpen) {
-  els.activityPicker.classList.toggle("open", isOpen);
-  els.activityToggle.setAttribute("aria-expanded", String(isOpen));
-}
-
-function syncActivityOptions() {
-  const currentActivity = els.activity.value.trim().toLowerCase();
-  els.activityMenu.querySelectorAll(".activity-option").forEach(button => {
-    const isSelected = button.dataset.activity.toLowerCase() === currentActivity;
-    button.classList.toggle("selected", isSelected);
-    button.setAttribute("aria-selected", String(isSelected));
-  });
-}
-
-function chooseActivity(activity) {
-  els.activity.value = activity;
-  syncActivityOptions();
-  setActivityMenuOpen(false);
-  showFormMessage("", false);
-}
-
 function handleAddEntry(event) {
   event.preventDefault();
   const date = els.entryDate.value;
@@ -562,8 +730,6 @@ function handleAddEntry(event) {
   els.durationMinutes.value = "";
   els.activity.value = "";
   els.note.value = "";
-  syncActivityOptions();
-  setActivityMenuOpen(false);
   showFormMessage("Saved. À demain.", true);
   renderAll();
 }
@@ -648,27 +814,14 @@ function init() {
   sortEntries();
   els.entryDate.value = state.selectedDate;
   els.entryForm.addEventListener("submit", handleAddEntry);
-  els.activity.addEventListener("input", syncActivityOptions);
-  els.activity.addEventListener("focus", () => setActivityMenuOpen(true));
-  els.activityToggle.addEventListener("click", () => {
-    setActivityMenuOpen(!els.activityPicker.classList.contains("open"));
-  });
-  els.activityMenu.addEventListener("click", event => {
-    const button = event.target.closest(".activity-option");
-    if (button) chooseActivity(button.dataset.activity);
-  });
-  document.addEventListener("click", event => {
-    if (!els.activityPicker.contains(event.target)) setActivityMenuOpen(false);
-  });
-  document.addEventListener("keydown", event => {
-    if (event.key === "Escape") setActivityMenuOpen(false);
-  });
   els.prevMonth.addEventListener("click", () => changeMonth(-1));
   els.nextMonth.addEventListener("click", () => changeMonth(1));
   els.exportBtn.addEventListener("click", exportData);
   els.importInput.addEventListener("change", event => importData(event.target.files[0]));
+  els.syncBtn.addEventListener("click", syncCloudNow);
   els.resetBtn.addEventListener("click", resetAllData);
   renderAll();
+  syncCloudNow();
 }
 
 init();
