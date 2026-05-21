@@ -220,6 +220,30 @@ function renderAuthState() {
   if (signedIn) updateCloudStatus(`Signed in as ${state.user.email || "your account"}.`);
 }
 
+function validateAuthInputs() {
+  const email = els.authEmail.value.trim();
+  const password = els.authPassword.value;
+  if (!email || !email.includes("@")) {
+    els.authFeedback.textContent = "Enter a valid email address.";
+    return null;
+  }
+  if (!password || password.length < 6) {
+    els.authFeedback.textContent = "Password must be at least 6 characters.";
+    return null;
+  }
+  return { email, password };
+}
+
+function setAuthBusy(isBusy, message = "") {
+  els.authForm.querySelectorAll("button").forEach(button => {
+    button.disabled = isBusy;
+  });
+  if (message) {
+    els.authFeedback.textContent = message;
+    els.authFeedback.classList.toggle("success", false);
+  }
+}
+
 async function authRequest(path, body, accessToken) {
   const response = await fetch(authUrl(path), {
     method: "POST",
@@ -1056,19 +1080,29 @@ function init() {
     event.preventDefault();
     els.authFeedback.textContent = "";
     els.authFeedback.classList.remove("success");
+    const authData = validateAuthInputs();
+    if (!authData) return;
     try {
-      await signIn(els.authEmail.value.trim(), els.authPassword.value);
+      setAuthBusy(true, "Signing in...");
+      await signIn(authData.email, authData.password);
     } catch (error) {
       els.authFeedback.textContent = error.message || "Sign in failed.";
+    } finally {
+      setAuthBusy(false);
     }
   });
   els.signUpBtn.addEventListener("click", async () => {
     els.authFeedback.textContent = "";
     els.authFeedback.classList.remove("success");
+    const authData = validateAuthInputs();
+    if (!authData) return;
     try {
-      await signUp(els.authEmail.value.trim(), els.authPassword.value);
+      setAuthBusy(true, "Creating account...");
+      await signUp(authData.email, authData.password);
     } catch (error) {
       els.authFeedback.textContent = error.message || "Account creation failed.";
+    } finally {
+      setAuthBusy(false);
     }
   });
   els.entryForm.addEventListener("submit", handleAddEntry);

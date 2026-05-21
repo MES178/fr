@@ -68,6 +68,11 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
 button:focus-visible,
 summary:focus-visible {
   outline: 3px solid rgba(134, 174, 200, 0.48);
@@ -126,17 +131,20 @@ textarea {
 }
 
 .auth-shell {
-  width: min(100%, 520px);
+  width: 100%;
+  max-width: 520px;
   min-height: 100svh;
   display: grid;
-  align-items: center;
+  align-items: start;
   margin: 0 auto;
-  padding: max(22px, env(safe-area-inset-top)) 16px max(34px, env(safe-area-inset-bottom));
+  padding: max(24px, env(safe-area-inset-top)) 18px max(34px, env(safe-area-inset-bottom));
   position: relative;
 }
 
 .auth-card {
   position: relative;
+  width: 100%;
+  margin: 14px auto 0;
   padding: 22px 19px 20px;
   border: 1px solid rgba(255, 255, 255, 0.74);
   border-radius: var(--radius);
@@ -147,10 +155,29 @@ textarea {
   overflow: hidden;
 }
 
+.auth-card h1 {
+  font-size: 2.42rem;
+  max-width: 8.5ch;
+}
+
+.auth-card .subtitle {
+  max-width: 28ch;
+}
+
 .auth-form {
   display: grid;
   gap: 12px;
   margin-top: 22px;
+}
+
+.auth-form .primary-btn,
+.auth-form .secondary-btn {
+  width: 100%;
+}
+
+.auth-form .secondary-btn {
+  margin-top: 0;
+  background: rgba(255, 255, 255, 0.58);
 }
 
 .hero {
