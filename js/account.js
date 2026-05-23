@@ -46,6 +46,25 @@ function saveSession(nextSession) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
 }
 
+function userEmail(user = session?.user) {
+  return user?.email ||
+    user?.user_metadata?.email ||
+    user?.user_metadata?.email_verified ||
+    user?.identities?.find(identity => identity?.identity_data?.email)?.identity_data?.email ||
+    "";
+}
+
+function updateSessionUser(user) {
+  if (!session || !user?.id) return;
+  saveSession({
+    ...session,
+    user: {
+      ...session.user,
+      ...user
+    }
+  });
+}
+
 function clearPasswordRecoveryPending() {
   try {
     localStorage.removeItem(PASSWORD_RECOVERY_PENDING_KEY);
@@ -125,9 +144,9 @@ async function authRequest(path, body, method = "POST") {
 }
 
 function renderAccount() {
-  const email = session?.user?.email || "Not signed in";
+  const email = userEmail() || "Not signed in";
   els.accountEmail.textContent = email;
-  els.accountInitial.textContent = session?.user?.email?.trim().charAt(0).toUpperCase() || "F";
+  els.accountInitial.textContent = email.trim().charAt(0).toUpperCase() || "F";
   if (!session?.access_token) {
     els.accountHint.textContent = "Sign in from the tracker first, then return here.";
     els.passwordForm.hidden = true;
@@ -225,6 +244,13 @@ function signOut() {
 async function init() {
   if (!(await handleAuthRedirect())) {
     session = loadSession();
+    if (!userEmail() && session?.access_token) {
+      try {
+        updateSessionUser(await fetchAuthUser(session.access_token));
+      } catch {
+        // The account page can still show password controls for the saved session.
+      }
+    }
     renderAccount();
   }
 

@@ -297,6 +297,25 @@ function setSession(session) {
   saveAuthSession(session);
 }
 
+function userEmail(user = state.user) {
+  return user?.email ||
+    user?.user_metadata?.email ||
+    user?.user_metadata?.email_verified ||
+    user?.identities?.find(identity => identity?.identity_data?.email)?.identity_data?.email ||
+    "";
+}
+
+function updateSessionUser(user) {
+  if (!state.session || !user?.id) return;
+  setSession({
+    ...state.session,
+    user: {
+      ...state.user,
+      ...user
+    }
+  });
+}
+
 function renderAuthState() {
   const signedIn = Boolean(state.session?.access_token && state.user?.id);
   const isPasswordRecovery = Boolean(signedIn && state.session?.isPasswordRecovery);
@@ -311,18 +330,18 @@ function renderAuthState() {
 
   if (signedIn) {
     renderAccountState();
-    updateCloudStatus(`Signed in as ${state.user.email || "your account"}.`);
+    updateCloudStatus(`Signed in as ${userEmail() || "your account"}.`);
   }
 }
 
 function renderAccountState() {
-  const email = state.user?.email || "your account";
+  const email = userEmail() || "your account";
   els.accountEmail.textContent = email;
   els.accountInitial.textContent = email.trim().charAt(0).toUpperCase() || "F";
 }
 
 function renderResetPasswordState() {
-  const email = state.user?.email || "your account";
+  const email = userEmail() || "your account";
   els.resetAccountEmail.textContent = email;
   window.setTimeout(() => els.resetNewPassword?.focus(), 80);
 }
@@ -716,6 +735,13 @@ async function syncCloudNow() {
 }
 
 async function loadAuthenticatedApp() {
+  if (!userEmail() && state.session?.access_token) {
+    try {
+      updateSessionUser(await fetchAuthUser(state.session.access_token));
+    } catch {
+      // The saved session can still load local data if profile refresh is unavailable.
+    }
+  }
   renderAuthState();
   state.entries = loadEntries();
   migrateLegacyEntriesToUser();
