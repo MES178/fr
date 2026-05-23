@@ -1,6 +1,7 @@
 const STORAGE_KEY = "frenchHabitTracker.entries.v1";
 const META_STORAGE_KEY = "frenchHabitTracker.meta.v1";
 const AUTH_STORAGE_KEY = "frenchHabitTracker.authSession.v1";
+const PASSWORD_RECOVERY_PENDING_KEY = "frenchHabitTracker.passwordRecoveryPending.v1";
 const CLOUD_TABLE = "habit_tracker_data";
 const cloudConfig = window.FHT_CLOUD_CONFIG || {};
 let cloudSaveTimer = null;
@@ -16,12 +17,28 @@ const state = {
 
 const els = {
   authView: document.getElementById("authView"),
+  resetPasswordView: document.getElementById("resetPasswordView"),
   appView: document.getElementById("appView"),
   authForm: document.getElementById("authForm"),
   authEmail: document.getElementById("authEmail"),
   authPassword: document.getElementById("authPassword"),
   signUpBtn: document.getElementById("signUpBtn"),
+  forgotPasswordBtn: document.getElementById("forgotPasswordBtn"),
   authFeedback: document.getElementById("authFeedback"),
+  resetPasswordForm: document.getElementById("resetPasswordForm"),
+  resetAccountEmail: document.getElementById("resetAccountEmail"),
+  resetNewPassword: document.getElementById("resetNewPassword"),
+  resetConfirmPassword: document.getElementById("resetConfirmPassword"),
+  resetPasswordBtn: document.getElementById("resetPasswordBtn"),
+  resetSignOutBtn: document.getElementById("resetSignOutBtn"),
+  resetPasswordFeedback: document.getElementById("resetPasswordFeedback"),
+  accountForm: document.getElementById("accountForm"),
+  accountInitial: document.getElementById("accountInitial"),
+  accountEmail: document.getElementById("accountEmail"),
+  newPassword: document.getElementById("newPassword"),
+  confirmPassword: document.getElementById("confirmPassword"),
+  updatePasswordBtn: document.getElementById("updatePasswordBtn"),
+  accountFeedback: document.getElementById("accountFeedback"),
   entryForm: document.getElementById("entryForm"),
   entryDate: document.getElementById("entryDate"),
   durationMinutes: document.getElementById("durationMinutes"),
@@ -173,6 +190,12 @@ function appRedirectUrl() {
   return url.toString();
 }
 
+function passwordRecoveryRedirectUrl() {
+  const url = new URL("account.html", appRedirectUrl());
+  url.searchParams.set("password-recovery", "1");
+  return url.toString();
+}
+
 function updateCloudStatus(message) {
   if (els.cloudStatus) els.cloudStatus.textContent = message;
 }
@@ -210,6 +233,42 @@ function saveAuthSession(session) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
 
+function markPasswordRecoveryPending(email) {
+  try {
+    localStorage.setItem(PASSWORD_RECOVERY_PENDING_KEY, JSON.stringify({
+      email,
+      createdAt: Date.now()
+    }));
+  } catch {
+    // The reset email can still work from the URL marker if localStorage is unavailable.
+  }
+}
+
+function clearPasswordRecoveryPending() {
+  try {
+    localStorage.removeItem(PASSWORD_RECOVERY_PENDING_KEY);
+  } catch {
+    // Non-critical cleanup.
+  }
+}
+
+function hasRecentPasswordRecoveryRequest() {
+  try {
+    const payload = JSON.parse(localStorage.getItem(PASSWORD_RECOVERY_PENDING_KEY) || "null");
+    return Boolean(payload?.createdAt && Date.now() - Number(payload.createdAt) < 60 * 60 * 1000);
+  } catch {
+    return false;
+  }
+}
+
+function isPasswordRecoveryCallback(hashParams, queryParams) {
+  const type = String(hashParams.get("type") || queryParams.get("type") || "").toLowerCase();
+  return type === "recovery" ||
+    queryParams.get("password-recovery") === "1" ||
+    hashParams.get("password-recovery") === "1" ||
+    hasRecentPasswordRecoveryRequest();
+}
+
 function normalizeSession(payload) {
   if (!payload?.access_token || !payload?.user?.id) return null;
   return {
@@ -220,14 +279,15 @@ function normalizeSession(payload) {
   };
 }
 
-function normalizeSessionFromHash(params, user) {
-  const accessToken = params.get("access_token");
+function normalizeSessionFromHash(hashParams, user, queryParams = new URLSearchParams()) {
+  const accessToken = hashParams.get("access_token");
   if (!accessToken || !user?.id) return null;
   return {
     access_token: accessToken,
-    refresh_token: params.get("refresh_token") || "",
-    expires_at: Number(params.get("expires_at")) || Math.floor(Date.now() / 1000) + Number(params.get("expires_in") || 3600),
-    user
+    refresh_token: hashParams.get("refresh_token") || "",
+    expires_at: Number(hashParams.get("expires_at")) || Math.floor(Date.now() / 1000) + Number(hashParams.get("expires_in") || 3600),
+    user,
+    isPasswordRecovery: isPasswordRecoveryCallback(hashParams, queryParams)
   };
 }
 
@@ -239,9 +299,32 @@ function setSession(session) {
 
 function renderAuthState() {
   const signedIn = Boolean(state.session?.access_token && state.user?.id);
+  const isPasswordRecovery = Boolean(signedIn && state.session?.isPasswordRecovery);
   els.authView.hidden = signedIn;
-  els.appView.hidden = !signedIn;
-  if (signedIn) updateCloudStatus(`Signed in as ${state.user.email || "your account"}.`);
+  els.resetPasswordView.hidden = !isPasswordRecovery;
+  els.appView.hidden = !signedIn || isPasswordRecovery;
+
+  if (isPasswordRecovery) {
+    renderResetPasswordState();
+    return;
+  }
+
+  if (signedIn) {
+    renderAccountState();
+    updateCloudStatus(`Signed in as ${state.user.email || "your account"}.`);
+  }
+}
+
+function renderAccountState() {
+  const email = state.user?.email || "your account";
+  els.accountEmail.textContent = email;
+  els.accountInitial.textContent = email.trim().charAt(0).toUpperCase() || "F";
+}
+
+function renderResetPasswordState() {
+  const email = state.user?.email || "your account";
+  els.resetAccountEmail.textContent = email;
+  window.setTimeout(() => els.resetNewPassword?.focus(), 80);
 }
 
 function validateAuthInputs() {
@@ -258,6 +341,48 @@ function validateAuthInputs() {
   return { email, password };
 }
 
+function validateRecoveryEmail() {
+  const email = els.authEmail.value.trim();
+  els.authFeedback.classList.remove("success");
+  if (!email || !email.includes("@")) {
+    els.authFeedback.textContent = "Enter your email, then tap Forgot password.";
+    return null;
+  }
+  return email;
+}
+
+function validatePasswordChange() {
+  const password = els.newPassword.value;
+  const confirmed = els.confirmPassword.value;
+  els.accountFeedback.classList.remove("success");
+
+  if (!password || password.length < 6) {
+    els.accountFeedback.textContent = "Use at least 6 characters for the new password.";
+    return null;
+  }
+  if (password !== confirmed) {
+    els.accountFeedback.textContent = "Both password fields need to match.";
+    return null;
+  }
+  return password;
+}
+
+function validateResetPasswordChange() {
+  const password = els.resetNewPassword.value;
+  const confirmed = els.resetConfirmPassword.value;
+  els.resetPasswordFeedback.classList.remove("success");
+
+  if (!password || password.length < 6) {
+    els.resetPasswordFeedback.textContent = "Use at least 6 characters for the new password.";
+    return null;
+  }
+  if (password !== confirmed) {
+    els.resetPasswordFeedback.textContent = "Both password fields need to match.";
+    return null;
+  }
+  return password;
+}
+
 function setAuthBusy(isBusy, message = "") {
   els.authForm.querySelectorAll("button").forEach(button => {
     button.disabled = isBusy;
@@ -268,11 +393,31 @@ function setAuthBusy(isBusy, message = "") {
   }
 }
 
-async function authRequest(path, body, accessToken) {
+function setAccountBusy(isBusy, message = "") {
+  els.updatePasswordBtn.disabled = isBusy;
+  if (message) {
+    els.accountFeedback.textContent = message;
+    els.accountFeedback.classList.remove("success");
+  }
+}
+
+function setResetPasswordBusy(isBusy, message = "") {
+  els.resetPasswordBtn.disabled = isBusy;
+  els.resetSignOutBtn.disabled = isBusy;
+  if (message) {
+    els.resetPasswordFeedback.textContent = message;
+    els.resetPasswordFeedback.classList.remove("success");
+  }
+}
+
+async function authRequest(path, body, accessToken, method = "POST") {
+  const options = {
+    method,
+    headers: authHeaders(accessToken)
+  };
+  if (body !== undefined) options.body = JSON.stringify(body);
   const response = await fetch(authUrl(path), {
-    method: "POST",
-    headers: authHeaders(accessToken),
-    body: JSON.stringify(body)
+    ...options
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error_description || payload.msg || payload.message || "Authentication failed");
@@ -291,16 +436,21 @@ async function fetchAuthUser(accessToken) {
 
 async function handleAuthRedirect() {
   if (!window.location.hash.includes("access_token=")) return false;
-  const params = new URLSearchParams(window.location.hash.slice(1));
-  const accessToken = params.get("access_token");
+  const hashParams = new URLSearchParams(window.location.hash.slice(1));
+  const queryParams = new URLSearchParams(window.location.search);
+  const accessToken = hashParams.get("access_token");
   if (!accessToken) return false;
 
   try {
     const user = await fetchAuthUser(accessToken);
-    const session = normalizeSessionFromHash(params, user);
+    const session = normalizeSessionFromHash(hashParams, user, queryParams);
     if (!session) throw new Error("Could not confirm account");
     setSession(session);
     window.history.replaceState(null, "", appRedirectUrl());
+    if (session.isPasswordRecovery) {
+      renderAuthState();
+      return true;
+    }
     await loadAuthenticatedApp();
     return true;
   } catch (error) {
@@ -312,6 +462,7 @@ async function handleAuthRedirect() {
 }
 
 async function signIn(email, password) {
+  clearPasswordRecoveryPending();
   const payload = await authRequest("token?grant_type=password", { email, password });
   const session = normalizeSession(payload);
   if (!session) throw new Error("Could not create a session");
@@ -320,6 +471,7 @@ async function signIn(email, password) {
 }
 
 async function signUp(email, password) {
+  clearPasswordRecoveryPending();
   const payload = await authRequest(`signup?redirect_to=${encodeURIComponent(appRedirectUrl())}`, { email, password });
   const session = normalizeSession(payload);
   if (session) {
@@ -331,8 +483,19 @@ async function signUp(email, password) {
   els.authFeedback.classList.add("success");
 }
 
+async function requestPasswordReset(email) {
+  await authRequest("recover", {
+    email,
+    redirect_to: passwordRecoveryRedirectUrl()
+  });
+  markPasswordRecoveryPending(email);
+  els.authFeedback.textContent = "Password reset email sent. Check your inbox.";
+  els.authFeedback.classList.add("success");
+}
+
 async function refreshSessionIfNeeded() {
-  if (!state.session?.refresh_token) return false;
+  if (!state.session?.access_token) return false;
+  if (!state.session?.refresh_token) return true;
   const expiresSoon = state.session.expires_at && state.session.expires_at < Math.floor(Date.now() / 1000) + 120;
   if (!expiresSoon) return true;
   try {
@@ -349,6 +512,35 @@ async function refreshSessionIfNeeded() {
   }
 }
 
+async function updateAccountPassword(password, options = {}) {
+  if (!(await refreshSessionIfNeeded())) {
+    renderAuthState();
+    throw new Error("Sign in again before changing your password.");
+  }
+  const user = await authRequest("user", { password }, undefined, "PUT");
+  if (user?.id) {
+    const nextSession = {
+      ...state.session,
+      user: {
+        ...state.user,
+        ...user
+      }
+    };
+    if (options.clearRecovery) delete nextSession.isPasswordRecovery;
+    setSession(nextSession);
+    renderAccountState();
+  }
+}
+
+async function finishPasswordRecovery(password) {
+  await updateAccountPassword(password, { clearRecovery: true });
+  clearPasswordRecoveryPending();
+  els.resetPasswordForm.reset();
+  await loadAuthenticatedApp();
+  els.accountFeedback.textContent = "Password updated. Très bien.";
+  els.accountFeedback.classList.add("success");
+}
+
 async function signOut() {
   if (state.session?.access_token) {
     fetch(authUrl("logout"), {
@@ -360,6 +552,11 @@ async function signOut() {
   state.entries = [];
   renderAuthState();
   els.authFeedback.textContent = "";
+  els.accountForm.reset();
+  els.accountFeedback.textContent = "";
+  els.resetPasswordForm.reset();
+  els.resetPasswordFeedback.textContent = "";
+  clearPasswordRecoveryPending();
 }
 
 function migrateLegacyEntriesToUser() {
@@ -1124,15 +1321,6 @@ function resetAllData() {
 
 async function init() {
   els.copyrightYear.textContent = String(new Date().getFullYear());
-  if (await handleAuthRedirect()) return;
-
-  const savedSession = loadAuthSession();
-  if (savedSession?.access_token && savedSession?.user?.id) {
-    setSession(savedSession);
-    loadAuthenticatedApp();
-  } else {
-    renderAuthState();
-  }
 
   els.authForm.addEventListener("submit", async event => {
     event.preventDefault();
@@ -1163,6 +1351,54 @@ async function init() {
       setAuthBusy(false);
     }
   });
+  els.forgotPasswordBtn.addEventListener("click", async () => {
+    els.authFeedback.textContent = "";
+    els.authFeedback.classList.remove("success");
+    const email = validateRecoveryEmail();
+    if (!email) return;
+    try {
+      setAuthBusy(true, "Sending reset email...");
+      await requestPasswordReset(email);
+    } catch (error) {
+      els.authFeedback.textContent = error.message || "Password reset failed.";
+      els.authFeedback.classList.remove("success");
+    } finally {
+      setAuthBusy(false);
+    }
+  });
+  els.resetPasswordForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const password = validateResetPasswordChange();
+    if (!password) return;
+    try {
+      setResetPasswordBusy(true, "Saving new password...");
+      await finishPasswordRecovery(password);
+    } catch (error) {
+      els.resetPasswordFeedback.textContent = error.message || "Password reset failed.";
+      els.resetPasswordFeedback.classList.remove("success");
+    } finally {
+      setResetPasswordBusy(false);
+    }
+  });
+  els.resetSignOutBtn.addEventListener("click", signOut);
+  els.accountForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const password = validatePasswordChange();
+    if (!password) return;
+    try {
+      setAccountBusy(true, "Updating password...");
+      await updateAccountPassword(password);
+      els.newPassword.value = "";
+      els.confirmPassword.value = "";
+      els.accountFeedback.textContent = "Password updated. Très bien.";
+      els.accountFeedback.classList.add("success");
+    } catch (error) {
+      els.accountFeedback.textContent = error.message || "Password update failed.";
+      els.accountFeedback.classList.remove("success");
+    } finally {
+      setAccountBusy(false);
+    }
+  });
   els.entryForm.addEventListener("submit", handleAddEntry);
   els.prevMonth.addEventListener("click", () => changeMonth(-1));
   els.nextMonth.addEventListener("click", () => changeMonth(1));
@@ -1171,6 +1407,20 @@ async function init() {
   els.syncBtn.addEventListener("click", syncCloudNow);
   els.signOutBtn.addEventListener("click", signOut);
   els.resetBtn.addEventListener("click", resetAllData);
+
+  if (await handleAuthRedirect()) return;
+
+  const savedSession = loadAuthSession();
+  if (savedSession?.access_token && savedSession?.user?.id) {
+    setSession(savedSession);
+    if (savedSession.isPasswordRecovery) {
+      renderAuthState();
+    } else {
+      loadAuthenticatedApp();
+    }
+  } else {
+    renderAuthState();
+  }
 }
 
 init();

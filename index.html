@@ -30,7 +30,35 @@
         </div>
         <button class="primary-btn" id="signInBtn" type="submit">Sign in</button>
         <button class="secondary-btn" id="signUpBtn" type="button">Create account</button>
+        <button class="secondary-btn forgot-password-btn" id="forgotPasswordBtn" type="button">Forgot password?</button>
         <p class="feedback" id="authFeedback" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
+  <section class="auth-shell" id="resetPasswordView" hidden>
+    <div class="auth-card">
+      <div class="microcopy">Très bien</div>
+      <h1>Reset password</h1>
+      <p class="subtitle">Create a new password before opening your French practice.</p>
+
+      <div class="reset-account">
+        <span>Resetting password for</span>
+        <strong id="resetAccountEmail">your account</strong>
+      </div>
+
+      <form class="auth-form" id="resetPasswordForm" novalidate>
+        <div class="field">
+          <label for="resetNewPassword">New password</label>
+          <input id="resetNewPassword" name="resetNewPassword" type="password" autocomplete="new-password" minlength="6" placeholder="At least 6 characters" required>
+        </div>
+        <div class="field">
+          <label for="resetConfirmPassword">Confirm password</label>
+          <input id="resetConfirmPassword" name="resetConfirmPassword" type="password" autocomplete="new-password" minlength="6" placeholder="Repeat new password" required>
+        </div>
+        <button class="primary-btn" id="resetPasswordBtn" type="submit">Save new password</button>
+        <button class="link-btn" id="resetSignOutBtn" type="button">Use another account</button>
+        <p class="feedback" id="resetPasswordFeedback" aria-live="polite"></p>
       </form>
     </div>
   </section>
@@ -40,6 +68,7 @@
       <div class="microcopy">Bonjour</div>
       <h1>French Habit Tracker</h1>
       <p class="subtitle">A quiet daily ritual for French practice, minutes, and momentum.</p>
+      <a class="account-page-link" href="account.html">Account</a>
 
       <section class="streak-banner" aria-label="Current streak">
         <div>
@@ -52,6 +81,39 @@
         </div>
       </section>
     </header>
+
+    <section class="card account-card" aria-labelledby="accountTitle">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title" id="accountTitle">Account</h2>
+          <p class="card-kicker">Your private French notebook.</p>
+        </div>
+      </div>
+
+      <div class="account-summary">
+        <div class="account-avatar" id="accountInitial" aria-hidden="true">F</div>
+        <div class="account-copy">
+          <span>Signed in as</span>
+          <strong id="accountEmail">your account</strong>
+          <p>Cloud sync is tied to this email.</p>
+        </div>
+      </div>
+
+      <form class="password-form" id="accountForm" novalidate>
+        <div class="field">
+          <label for="newPassword">New password</label>
+          <input id="newPassword" name="newPassword" type="password" autocomplete="new-password" minlength="6" placeholder="At least 6 characters">
+        </div>
+        <div class="field">
+          <label for="confirmPassword">Confirm password</label>
+          <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="6" placeholder="Repeat new password">
+        </div>
+        <button class="secondary-btn" id="updatePasswordBtn" type="submit">Update password</button>
+        <p class="feedback" id="accountFeedback" aria-live="polite"></p>
+      </form>
+
+      <button class="danger-btn switch-account-btn" id="signOutBtn" type="button">Switch account</button>
+    </section>
 
     <section class="card" aria-labelledby="quickAddTitle">
       <div class="card-header">
@@ -176,7 +238,7 @@
       </div>
       <div class="settings-actions">
         <button class="secondary-btn" id="syncBtn" type="button">Sync now</button>
-        <button class="secondary-btn" id="signOutBtn" type="button">Sign out</button>
+        <a class="secondary-btn account-nav-btn" href="account.html">Account & password</a>
         <button class="secondary-btn" id="exportBtn" type="button">Export JSON</button>
         <label class="file-label">
           Import JSON
